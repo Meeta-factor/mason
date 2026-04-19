@@ -29,7 +29,7 @@
 
 ## ⚙️ 安装方式
 ```bash
-git clone xxx
+git clone https://github.com/Meeta-factor/mason.git
 cd mason
 pip install -e .
 python examples/siso_sfg.py
