@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mason-solver"
+version = "0.1.0"
+description = "Symbolic Mason Gain Formula Solver"
+requires-python = ">=3.8"
+dependencies = [
+    "sympy",
+    "networkx",
+    "matplotlib",
+    "graphviz",
+]
+readme = "README.md"
+
+[tool.setuptools]
+packages = ["mason"]
