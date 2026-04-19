@@ -28,24 +28,14 @@
 ---
 
 ## ⚙️ 安装方式
+推荐使用虚拟环境：
 ```bash
 git clone https://github.com/Meeta-factor/mason.git
 cd mason
-pip install -e .
-python examples/siso_sfg.py
-```
-
-推荐使用虚拟环境：
-
-```bash
 python -m venv .venv
 source .venv/bin/activate
-```
-
-开发模式安装：
-
-```bash
 pip install -e .
+python examples/siso_sfg.py
 ```
 
 ---
