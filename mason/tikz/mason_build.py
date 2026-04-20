@@ -1,6 +1,7 @@
 import csv
 import os
 import re
+from collections import defaultdict
 
 
 def fmt_node_label(name: str) -> str:
@@ -100,6 +101,99 @@ def is_forward_edge(s: str, t: str) -> bool:
     return i is not None and j is not None and i < j
 
 
+def parse_node(name: str):
+    """
+    返回 (prefix, index)
+    例如:
+        n3 -> ("n", 3)
+        R1 -> ("R", 1)
+        D  -> ("D", None)
+    """
+    m = re.fullmatch(r"([A-Za-z]+)(\d+)", name)
+    if m:
+        return m.group(1), int(m.group(2))
+    return name, None
+
+
+def collect_nodes(edges):
+    nodes = set()
+    for s, t, _ in edges:
+        nodes.add(s)
+        nodes.add(t)
+    return nodes
+
+
+def auto_positions(edges, x_gap=2.0, y_gap=3.0):
+    nodes = collect_nodes(edges)
+
+    groups = defaultdict(list)
+    others = []
+
+    for node in nodes:
+        prefix, idx = parse_node(node)
+
+        if prefix in {"R", "n", "C", "m", "D"}:
+            groups[prefix].append((node, idx))
+        else:
+            others.append(node)
+
+    # 每组内部按编号排序，没有编号的放最后
+    for k in groups:
+        groups[k].sort(key=lambda x: (x[1] is None, x[1]))
+
+    positions = {}
+
+    # 先处理 n 支路：R -> n -> C
+    n_y = y_gap
+    m_y = 0.0
+    d_y = -2.0
+
+    # ---- 上支路 ----
+    n_chain = [node for node, _ in groups["n"]]
+    r_nodes = [node for node, _ in groups["R"]]
+    c_nodes = [node for node, _ in groups["C"]]
+
+    # 简单策略：
+    # R1 放在 n1 左边
+    # C1 放在 n链右边
+    n_x_start = 2.0
+
+    for i, node in enumerate(n_chain):
+        positions[node] = (n_x_start + i * x_gap, n_y)
+
+    # 先假定 R1 对应上支路，R2 对应下支路；C1 对应上支路，C2 对应下支路
+    # 这是你当前命名体系下最自然的默认规则
+    r_sorted = [node for node, _ in groups["R"]]
+    c_sorted = [node for node, _ in groups["C"]]
+    m_chain = [node for node, _ in groups["m"]]
+
+    if len(r_sorted) >= 1:
+        positions[r_sorted[0]] = (0.0, n_y)
+    if len(c_sorted) >= 1:
+        positions[c_sorted[0]] = (n_x_start + len(n_chain) * x_gap, n_y)
+
+    # ---- 下支路 ----
+    m_x_start = 2.0
+    for i, node in enumerate(m_chain):
+        positions[node] = (m_x_start + i * x_gap, m_y)
+
+    if len(r_sorted) >= 2:
+        positions[r_sorted[1]] = (0.0, m_y)
+    if len(c_sorted) >= 2:
+        positions[c_sorted[1]] = (m_x_start + len(m_chain) * x_gap, m_y)
+
+    # ---- 扰动 ----
+    d_nodes = [node for node, _ in groups["D"]]
+    for i, node in enumerate(d_nodes):
+        positions[node] = (0.0, d_y - i * 1.5)
+
+    # ---- 其他未知节点 ----
+    # 先放在中间层，避免炸掉
+    for i, node in enumerate(sorted(others)):
+        positions[node] = (2.0 + i * x_gap, -y_gap)
+
+    return positions
+
 def default_positions() -> dict[str, tuple[float, float]]:
     """
     先给你一套适配当前数据的固定布局。
@@ -185,17 +279,7 @@ def edge_to_tikz(
 
 
 def csv_to_tikz(csv_path: str) -> str:
-    positions = default_positions()
-
-    # 这里允许你对少数边做人为精修
-    style_overrides = {
-        # 你要是以后想把某条边改成更像教材那样，可以在这里改
-        # ("n3", "m2"): {"mode": "straight", "node_opt": "pos=0.38,right"},
-        # ("m3", "n2"): {"mode": "straight", "node_opt": "pos=0.62,left"},
-    }
-
-    lines = [r"\begin{tikzpicture}[>=stealth,->,auto]"]
-    lines.extend(build_node_lines(positions))
+    edges = []
 
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -203,7 +287,15 @@ def csv_to_tikz(csv_path: str) -> str:
             s = row["start"].strip()
             t = row["end"].strip()
             g = row["gain"].strip()
-            lines.append(edge_to_tikz(s, t, g, positions, style_overrides))
+            edges.append((s, t, g))
+
+    positions = auto_positions(edges)
+
+    lines = [r"\begin{tikzpicture}[>=stealth,->,auto]"]
+    lines.extend(build_node_lines(positions))
+
+    for s, t, g in edges:
+        lines.append(edge_to_tikz(s, t, g, positions))
 
     lines.append(r"\end{tikzpicture}")
     return "\n".join(lines)
@@ -212,7 +304,7 @@ def csv_to_tikz(csv_path: str) -> str:
 def build_tex(csv_path: str, output: str | None = None) -> str:
     tikz = csv_to_tikz(csv_path)
 
-    tex = rf"""\documentclass{{article}}
+    tex = rf"""\documentclass{{standalone}}
 \pagestyle{{empty}}
 \usepackage{{tikz}}
 \usetikzlibrary{{arrows.meta,bending}}
@@ -231,8 +323,7 @@ def build_tex(csv_path: str, output: str | None = None) -> str:
 
     return output
 
-
-if __name__ == "__main__":
+def main():
     import sys
 
     if len(sys.argv) < 2:
@@ -243,3 +334,7 @@ if __name__ == "__main__":
     output = sys.argv[2] if len(sys.argv) >= 3 else None
     out_file = build_tex(csv_path, output)
     print(f"[OK] Generated {out_file}")
+
+
+if __name__ == "__main__":
+    main()

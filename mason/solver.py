@@ -198,6 +198,48 @@ class SISOMasonSolver:
         """
         untouched_loops = [loop for loop in all_loops if not self.touching_path(loop, path)]
         return self.delta_from_loops(untouched_loops)
+    
+    def delta_k_info(self, path: Path, all_loops: List[Loop]) -> Dict:
+        """
+        返回与某条前向通路 path 对应的 Δ_k 构造信息。
+
+        说明：
+        - loops_used: 保留下来的、不接触该 path 的回路在 all_loops 中的索引
+        - non_touching_groups: 这些保留回路之间的高阶非接触组合，索引形式返回
+        """
+        untouched_indices = []
+        untouched_loops = []
+
+        for idx, loop in enumerate(all_loops):
+            if not self.touching_path(loop, path):
+                untouched_indices.append(idx)
+                untouched_loops.append(loop)
+
+        nt_groups_raw = self.non_touching_loop_groups(untouched_loops)
+
+        # 把局部组合重新映射回 all_loops 的全局索引
+        local_to_global = {
+            local_idx: global_idx
+            for local_idx, global_idx in enumerate(untouched_indices)
+        }
+
+        nt_groups_idx: Dict[int, List[List[int]]] = {}
+        for r, groups in nt_groups_raw.items():
+            mapped_groups = []
+            for group in groups:
+                mapped = []
+                for loop in group:
+                    local_idx = untouched_loops.index(loop)
+                    mapped.append(local_to_global[local_idx])
+                mapped_groups.append(mapped)
+            nt_groups_idx[r] = mapped_groups
+
+        return {
+            "loops_used": untouched_indices,
+            "non_touching_groups": nt_groups_idx
+        }
+    
+
 
     def transfer_function(
         self,
@@ -219,17 +261,43 @@ class SISOMasonSolver:
 
         delta = self.delta_from_loops(loops)
 
+        nt_groups = self.non_touching_loop_groups(loops)
+
+        delta_info = {
+            "single_loops": [
+                {
+                    "loop": loop,
+                    "gain": self.loop_gain(loop)
+                }
+                for loop in loops
+            ],
+            "non_touching_groups": {
+                r: [
+                    {
+                        "loops": list(group),
+                        "gain_product": sp.simplify(
+                            sp.prod(self.loop_gain(loop) for loop in group)
+                        )
+                    }
+                    for group in groups
+                ]
+                for r, groups in nt_groups.items()
+            }
+        }
+
         numerator = sp.Integer(0)
         path_data = []
         for path in paths:
             pk = self.path_gain(path)
             dk = self.delta_k(path, loops)
-            # Mason 分子项是每条前向通路增益与其对应 Δ_k 的乘积之和。
-            numerator += pk * dk # type: ignore
+            dk_info = self.delta_k_info(path, loops)
+
+            numerator += pk * dk  # type: ignore
             path_data.append({
                 "path": path,
                 "P": sp.simplify(pk),
-                "Delta_k": sp.simplify(dk)
+                "Delta_k": sp.simplify(dk),
+                "Delta_k_info": dk_info
             })
 
         T = sp.simplify(sp.together(numerator / delta)) # type: ignore
@@ -240,6 +308,7 @@ class SISOMasonSolver:
             "forward_paths": path_data,
             "loops": [{"loop": loop, "gain": self.loop_gain(loop)} for loop in loops],
             "Delta": sp.simplify(delta),
+            "Delta_info": delta_info,
             "TransferFunction": T
         }
         return T, debug_info

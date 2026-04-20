@@ -17,3 +17,6 @@ readme = "README.md"
 
 [tool.setuptools]
 packages = ["mason"]
+
+[project.scripts]
+mason-build = "mason_build:main"

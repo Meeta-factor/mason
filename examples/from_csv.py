@@ -2,7 +2,7 @@ from mason import MIMOMasonSolver
 from mason.visualize import *
 import pandas as pd
 import sympy as sp
-df = pd.read_csv("data.csv")
+df = pd.read_csv("../mason/tikz/data.csv")
 solver = MIMOMasonSolver()
 
 data = {

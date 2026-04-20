@@ -1,13 +1,13 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR/mason/tikz"
-
-echo "[mason-build] running make $*"
+cd "$SCRIPT_DIR/tikz"
 
 if [ $# -eq 0 ]; then
     make
 else
     make "$@"
 fi
+
+clear
