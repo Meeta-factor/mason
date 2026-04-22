@@ -10,8 +10,8 @@ requires-python = ">=3.8"
 dependencies = [
     "sympy",
     "networkx",
-    "matplotlib",
-    "graphviz",
+    "pytest",
+    "control",
 ]
 readme = "README.md"
 

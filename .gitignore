@@ -56,3 +56,7 @@ Thumbs.db
 *.xlsx
 *.mat
 !examples/*.csv
+
+# =========================
+# dist
+dist/
