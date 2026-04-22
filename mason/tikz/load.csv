@@ -1,0 +1,30 @@
+start,end,gain
+ACE1,Pref1,-KI1/s
+Pref1,U1,1
+w1,U1,-1/R1
+U1,Pv1,1/(1+s*Tg1)
+Pv1,Pm1,1/(1+s*Tt1)
+Pm1,X1,1
+PL1,X1,-1
+P12,X1,-1
+X1,w1,1/(2*H1*s + D1)
+
+ACE2,Pref2,-KI2/s
+Pref2,U2,1
+w2,U2,-1/R2
+U2,Pv2,1/(1+s*Tg2)
+Pv2,Pm2,1/(1+s*Tt2)
+Pm2,X2,1
+PL2,X2,-1
+P12,X2,1
+X2,w2,1/(2*H2*s + D2)
+
+w1,Dw12,1
+w2,Dw12,-1
+Dw12,P12,T12/s
+
+P12,ACE1,1
+w1,ACE1,B1
+
+P12,ACE2,-1
+w2,ACE2,B2

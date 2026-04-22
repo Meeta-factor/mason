@@ -56,7 +56,8 @@ Thumbs.db
 *.xlsx
 *.mat
 !examples/*.csv
-
+!mason/tikz/*.csv
 # =========================
 # dist
 dist/
+
