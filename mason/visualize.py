@@ -54,23 +54,23 @@ def show_result_mason(info: Dict[str, Any]) -> None:
         loop_nodes = list(map(str, l["loop"]))
         loop_str = r" \rightarrow ".join(loop_nodes) + r" \rightarrow " + loop_nodes[0]
         display(Math(r"\text{Loop } %d:\ %s" % (i, loop_str)))
-        display(Math(r"L_%d = %s" % (i, sp.latex(l["gain"]))))
+        display(Math(r"L_{%d} = %s" % (i, sp.latex(l["gain"]))))
 
     display(Math(r"\textbf{Forward Paths}"))
     for i, p in enumerate(info["forward_paths"], 1):
         path_str = r" \rightarrow ".join(map(str, p["path"]))
         display(Math(r"\text{Path } %d:\ %s" % (i, path_str)))
-        display(Math(r"P_%d = %s" % (i, sp.latex(p["P"]))))
+        display(Math(r"P_%d = {%s}" % (i, sp.latex(p["P"]))))
 
         if "Delta_k" in p:
-            display(Math(r"\Delta_%d = %s" % (i, sp.latex(p["Delta_k"]))))
+            display(Math(r"\Delta_{%d} = %s" % (i, sp.latex(p["Delta_k"]))))
 
     display(Math(r"\textbf{System Determinant}"))
 
     loop_labels = {}
     for i, l in enumerate(info["loops"], 1):
         key = tuple(l["loop"])
-        loop_labels[key] = f"L_{i}"
+        loop_labels[key] = f"L_{{{i}}}"
 
     delta_info = info.get("Delta_info", {})
     single_loops = delta_info.get("single_loops", [])
@@ -141,14 +141,14 @@ def show_result_shannon(info: Dict[str, Any]) -> None:
         loop_nodes = list(map(str, l["loop"]))
         loop_str = r" \rightarrow ".join(loop_nodes) + r" \rightarrow " + loop_nodes[0]
         display(Math(r"\text{Loop } %d:\ %s" % (i, loop_str)))
-        display(Math(r"L_%d = %s" % (i, sp.latex(l["gain"]))))
+        display(Math(r"L_{%d} = %s" % (i, sp.latex(l["gain"]))))
 
     if "forward_paths" in info:
         display(Math(r"\textbf{Original Forward Paths}"))
         for i, p in enumerate(info["forward_paths"], 1):
             path_str = r" \rightarrow ".join(map(str, p["path"]))
             display(Math(r"\text{Path } %d:\ %s" % (i, path_str)))
-            display(Math(r"P_%d = %s" % (i, sp.latex(p["gain"]))))
+            display(Math(r"P_{%d} = %s" % (i, sp.latex(p["gain"]))))
 
     display(Math(r"\textbf{Characteristic Equation}"))
 
@@ -156,7 +156,7 @@ def show_result_shannon(info: Dict[str, Any]) -> None:
     loop_labels = {}
     for i, l in enumerate(info["closed_loops"], 1):
         key = tuple(l["loop"])
-        loop_labels[key] = f"L_{i}"
+        loop_labels[key] = f"L_{{{i}}}"
 
     nt_groups = info.get("non_touching_groups", {})
     closed_loops = info.get("closed_loops", [])

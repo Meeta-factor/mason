@@ -60,4 +60,5 @@ Thumbs.db
 # =========================
 # dist
 dist/
+.codex
 

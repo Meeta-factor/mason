@@ -1,0 +1,43 @@
+\documentclass{standalone}
+\pagestyle{empty}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,bending}
+
+\begin{document}
+\noindent
+\begin{tikzpicture}[
+  >=Latex,
+  ->,
+  semithick,
+  every node/.style={font=\small},
+  signal node/.style={circle,draw,minimum size=8mm,inner sep=1pt,fill=white},
+  io node/.style={rectangle,rounded corners=2pt,draw,minimum width=8mm,minimum height=6mm,inner sep=2pt,fill=gray!8},
+  every path/.style={draw=black!85},
+  edge label/.style={fill=white,inner sep=1pt,text=black},
+]
+\node[signal node] (n1) at (2.0,3.0) {$n_1$};
+\node[signal node] (n2) at (4.0,3.0) {$n_2$};
+\node[signal node] (n3) at (6.0,3.0) {$n_3$};
+\node[io node] (R1) at (0.0,3.0) {$R_1$};
+\node[io node] (C1) at (8.0,3.0) {$C_1$};
+\node[signal node] (m1) at (2.0,0.0) {$m_1$};
+\node[signal node] (m2) at (4.0,0.0) {$m_2$};
+\node[signal node] (m3) at (6.0,0.0) {$m_3$};
+\node[io node] (R2) at (0.0,0.0) {$R_2$};
+\node[io node] (C2) at (8.0,0.0) {$C_2$};
+\node[io node] (D) at (0.0,-2.0) {$D$};
+\draw (R1) -- node[edge label,midway,above] {$1$} (n1);
+\draw (n1) -- node[edge label,midway,above] {$1$} (n2);
+\draw (n2) -- node[edge label,midway,above] {$G_1$} (n3);
+\draw (n3) -- node[edge label,midway,above] {$1$} (C1);
+\draw (R2) -- node[edge label,midway,above] {$1$} (m1);
+\draw (m1) -- node[edge label,midway,above] {$1$} (m2);
+\draw (m2) -- node[edge label,midway,above] {$G_2$} (m3);
+\draw (m3) -- node[edge label,midway,above] {$1$} (C2);
+\draw (n3) to[out=125,in=55,looseness=1.38] node[edge label,midway,above] {$-a_{11}$} (n1);
+\draw (m3) to[out=-125,in=-55,looseness=1.38] node[edge label,midway,below] {$-a_{22}$} (m1);
+\draw (n3) to[out=-162,in=162,looseness=0.63] node[edge label,midway,left] {$-a_{12}$} (m2);
+\draw (m3) to[out=162,in=-162,looseness=0.63] node[edge label,midway,right] {$-a_{21}$} (n2);
+\draw (D) -- node[edge label,midway,left] {$\sigma$} (m1);
+\end{tikzpicture}
+\end{document}
