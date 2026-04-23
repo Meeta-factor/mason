@@ -26,6 +26,9 @@ def fmt_gain(gain: str) -> str:
     例如:
         G1     -> $G_1$
         -a11   -> $-a_{11}$
+        H_1b   -> $H_{1b}$
+        H_1^b  -> $H_{1}^{b}$
+        G^*    -> $G^{*}$
         sigma  -> $\\sigma$
         1      -> $1$
     """
@@ -46,6 +49,24 @@ def fmt_gain(gain: str) -> str:
         if len(num) == 1:
             return rf"${sign}{head}_{num}$"
         return rf"${sign}{head}_{{{num}}}$"
+
+    # H_1^b -> H_{1}^{b}, -a_12^* -> -a_{12}^{*}
+    m = re.fullmatch(r"(-?)([A-Za-z]+)_([A-Za-z0-9]+)\^([A-Za-z0-9*+\-]+)", gain)
+    if m:
+        sign, head, sub, sup = m.groups()
+        return rf"${sign}{head}_{{{sub}}}^{{{sup}}}$"
+
+    # G^* -> G^{*}, H^b -> H^{b}
+    m = re.fullmatch(r"(-?)([A-Za-z]+)\^([A-Za-z0-9*+\-]+)", gain)
+    if m:
+        sign, head, sup = m.groups()
+        return rf"${sign}{head}^{{{sup}}}$"
+
+    # H_1b -> H_{1b}, -a_12 -> -a_{12}
+    m = re.fullmatch(r"(-?)([A-Za-z]+)_([A-Za-z0-9]+)", gain)
+    if m:
+        sign, head, sub = m.groups()
+        return rf"${sign}{head}_{{{sub}}}$"
 
     return rf"${gain}$"
 
@@ -123,7 +144,121 @@ def collect_nodes(edges):
     return nodes
 
 
+def has_dual_branch_layout(edges) -> bool:
+    nodes = collect_nodes(edges)
+    return any(name.startswith("n") for name in nodes) or any(name.startswith("m") for name in nodes)
+
+
+def build_edge_sets(edges):
+    edge_pairs = {(s, t) for s, t, _ in edges}
+    reverse_pairs = {pair for pair in edge_pairs if (pair[1], pair[0]) in edge_pairs}
+    return edge_pairs, reverse_pairs
+
+
+def generic_main_path(edges):
+    edge_pairs, reverse_pairs = build_edge_sets(edges)
+    main_edges = [(s, t) for s, t, _ in edges if (s, t) not in reverse_pairs]
+
+    if not main_edges:
+        return []
+
+    adjacency = defaultdict(list)
+    indegree = defaultdict(int)
+    nodes = collect_nodes(edges)
+
+    for s, t in main_edges:
+        adjacency[s].append(t)
+        indegree[t] += 1
+        indegree.setdefault(s, 0)
+
+    preferred_sources = [n for n in ("R", "R1", "X") if n in nodes]
+    sources = preferred_sources or [n for n in nodes if indegree.get(n, 0) == 0]
+    if not sources:
+        sources = [main_edges[0][0]]
+
+    preferred_sinks = {"Y", "C", "C1", "Z"}
+
+    best_path = []
+
+    def score(path):
+        sink_bonus = 1 if path and path[-1] in preferred_sinks else 0
+        return (len(path), sink_bonus)
+
+    def dfs(node, path, seen):
+        nonlocal best_path
+        if score(path) > score(best_path):
+            best_path = path[:]
+
+        for nxt in adjacency.get(node, []):
+            if nxt in seen:
+                continue
+            seen.add(nxt)
+            path.append(nxt)
+            dfs(nxt, path, seen)
+            path.pop()
+            seen.remove(nxt)
+
+    for source in sources:
+        dfs(source, [source], {source})
+
+    return best_path
+
+
+def auto_positions_generic(edges, x_gap=2.2, y_gap=2.2):
+    nodes = collect_nodes(edges)
+    positions = {}
+    edge_pairs, reverse_pairs = build_edge_sets(edges)
+    main_path = generic_main_path(edges)
+
+    if not main_path:
+        for i, node in enumerate(sorted(nodes)):
+            positions[node] = (i * x_gap, 0.0)
+        return positions
+
+    for i, node in enumerate(main_path):
+        positions[node] = (i * x_gap, 0.0)
+
+    levels_used = defaultdict(int)
+    attached = set(main_path)
+
+    for anchor in main_path:
+        partners = []
+        for s, t, _ in edges:
+            if s == anchor and (t, s) in reverse_pairs and t not in attached:
+                partners.append(t)
+            elif t == anchor and (t, s) in reverse_pairs and s not in attached:
+                partners.append(s)
+
+        unique_partners = []
+        seen = set()
+        for node in partners:
+            if node not in seen:
+                unique_partners.append(node)
+                seen.add(node)
+
+        slot_order = [0, -1, 1, -2, 2, -3, 3]
+        for idx, node in enumerate(unique_partners):
+            level = levels_used[anchor]
+            levels_used[anchor] += 1
+            x, y = positions[anchor]
+            slot = slot_order[idx] if idx < len(slot_order) else ((idx // 2 + 1) * (-1 if idx % 2 else 1))
+            x_offset = 0.9 * slot
+            y_offset = y_gap + level * 1.5 + abs(slot) * 0.4
+            positions[node] = (x + x_offset, y + y_offset)
+            attached.add(node)
+
+    remaining = [node for node in sorted(nodes) if node not in positions]
+    base_x = len(main_path) * x_gap
+    for i, node in enumerate(remaining):
+        positions[node] = (base_x + i * x_gap, -y_gap)
+
+    return positions
+
+
 def auto_positions(edges, x_gap=2.0, y_gap=3.0):
+    if not has_dual_branch_layout(edges):
+        return auto_positions_generic(edges, x_gap=x_gap, y_gap=2.6)
+
     nodes = collect_nodes(edges)
 
     groups = defaultdict(list)
@@ -210,8 +345,101 @@ def build_node_lines(positions: dict[str, tuple[float, float]]) -> list[str]:
     lines = []
     for name, (x, y) in positions.items():
         label = fmt_node_label(name)
-        lines.append(rf"\node ({name}) at ({x},{y}) {{{label}}};")
+        prefix, _ = parse_node(name)
+        style = "io node" if prefix in {"R", "C", "D"} else "signal node"
+        lines.append(rf"\node[{style}] ({name}) at ({x},{y}) {{{label}}};")
     return lines
+
+
+def edge_direction(
+    s: str,
+    t: str,
+    positions: dict[str, tuple[float, float]],
+) -> tuple[float, float]:
+    x1, y1 = positions[s]
+    x2, y2 = positions[t]
+    return x2 - x1, y2 - y1
+
+
+def straight_label_opt(
+    s: str,
+    t: str,
+    positions: dict[str, tuple[float, float]],
+) -> str:
+    dx, dy = edge_direction(s, t, positions)
+
+    if abs(dy) < 0.2:
+        return "midway,above"
+    if abs(dx) < 0.2:
+        return "midway,right"
+    if dx * dy > 0:
+        return "midway,above left"
+    return "midway,above right"
+
+
+def with_edge_label_style(node_opt: str) -> str:
+    return f"edge label,{node_opt}" if node_opt else "edge label"
+
+
+def is_reverse_pair(s: str, t: str, edge_pairs: set[tuple[str, str]]) -> bool:
+    return (t, s) in edge_pairs
+
+
+def paired_loop_edge_style(
+    s: str,
+    t: str,
+    positions: dict[str, tuple[float, float]],
+) -> tuple[int, int, str, float]:
+    dx, dy = edge_direction(s, t, positions)
+    abs_dx = abs(dx)
+
+    if dy > 0:
+        if dx < -0.2:
+            return 120, 250, "pos=0.35,left,xshift=-2pt,yshift=2pt", 0.9 + 0.08 * abs_dx
+        if dx > 0.2:
+            return 60, 290, "pos=0.35,right,xshift=2pt,yshift=2pt", 0.9 + 0.08 * abs_dx
+        return 100, 260, "pos=0.35,left,xshift=-2pt,yshift=2pt", 0.85
+
+    if dx < -0.2:
+        return 240, 110, "pos=0.65,left,xshift=-2pt,yshift=-2pt", 0.9 + 0.08 * abs_dx
+    if dx > 0.2:
+        return 300, 70, "pos=0.65,right,xshift=2pt,yshift=-2pt", 0.9 + 0.08 * abs_dx
+    return 280, 80, "pos=0.65,right,xshift=2pt,yshift=-2pt", 0.85
+
+
+def feedback_angles(
+    s: str,
+    t: str,
+    positions: dict[str, tuple[float, float]],
+) -> tuple[int, int, str, float]:
+    dx, _ = edge_direction(s, t, positions)
+    span = max(abs(dx), 1.0)
+    looseness = 0.9 + 0.12 * span
+
+    if node_group(s) == "n":
+        return 125, 55, "midway,above", looseness
+    return -125, -55, "midway,below", looseness
+
+
+def cross_coupling_style(
+    s: str,
+    t: str,
+    positions: dict[str, tuple[float, float]],
+) -> tuple[int, int, str, float]:
+    dx, _ = edge_direction(s, t, positions)
+    span = max(abs(dx), 1.0)
+    looseness = 0.55 + 0.04 * span
+
+    # 就近原则：目标在右边就从右侧出入，目标在左边就从左侧出入
+    # 同时保留一点上下倾角，避免贴着节点边缘滑出去
+    if dx >= 0:
+        if node_group(s) == "n" and node_group(t) == "m":
+            return -18, 18, "midway,right", looseness
+        return 18, -18, "midway,left", looseness
+
+    if node_group(s) == "n" and node_group(t) == "m":
+        return -162, 162, "midway,left", looseness
+    return 162, -162, "midway,right", looseness
 
 
 def edge_to_tikz(
@@ -219,6 +447,7 @@ def edge_to_tikz(
     t: str,
     g: str,
     positions: dict[str, tuple[float, float]],
+    edge_pairs: set[tuple[str, str]],
     style_overrides: dict[tuple[str, str], dict] | None = None,
 ) -> str:
     """
@@ -238,44 +467,55 @@ def edge_to_tikz(
     mode = override.get("mode")
 
     if mode == "straight":
-        node_opt = override.get("node_opt", "")
+        node_opt = with_edge_label_style(
+            override.get("node_opt", straight_label_opt(s, t, positions))
+        )
         node_part = rf" node[{node_opt}] {{{label}}}" if node_opt else rf" node {{{label}}}"
         return rf"\draw ({s}) --{node_part} ({t});"
 
     if mode == "curve":
         out_angle = override.get("out", 120)
         in_angle = override.get("in", 60)
-        node_opt = override.get("node_opt", "pos=0.5,above")
-        return rf"\draw ({s}) to[out={out_angle},in={in_angle}] node[{node_opt}] {{{label}}} ({t});"
+        looseness = override.get("looseness")
+        node_opt = with_edge_label_style(override.get("node_opt", "midway,above"))
+        looseness_opt = rf",looseness={looseness}" if looseness is not None else ""
+        return rf"\draw ({s}) to[out={out_angle},in={in_angle}{looseness_opt}] node[{node_opt}] {{{label}}} ({t});"
+
+    # 0) 成对双向边：给单回路侧支路留出左右两条通道，避免完全重合
+    dx, dy = edge_direction(s, t, positions)
+    if is_reverse_pair(s, t, edge_pairs) and abs(dy) > 0.5 and abs(dx) <= 1.8:
+        out_angle, in_angle, node_opt, looseness = paired_loop_edge_style(s, t, positions)
+        return (
+            rf"\draw ({s}) to[out={out_angle},in={in_angle},looseness={looseness:.2f}] "
+            rf"node[{with_edge_label_style(node_opt)}] {{{label}}} ({t});"
+        )
 
     # 1) 扰动输入
     if is_disturbance_edge(s, t):
-        return rf"\draw ({s}) -- node[left] {{{label}}} ({t});"
+        return rf"\draw ({s}) -- node[{with_edge_label_style('midway,left')}] {{{label}}} ({t});"
 
     # 2) 同支路反馈
     if is_same_branch_feedback(s, t):
-        if node_group(s) == "n":
-            # 上支路反馈，从上方绕
-            return rf"\draw ({s}) to[out=120,in=60] node[pos=0.5,above] {{{label}}} ({t});"
-        else:
-            # 下支路反馈，从下方绕
-            return rf"\draw ({s}) to[out=-120,in=-60] node[pos=0.5,below] {{{label}}} ({t});"
+        out_angle, in_angle, node_opt, looseness = feedback_angles(s, t, positions)
+        return (
+            rf"\draw ({s}) to[out={out_angle},in={in_angle},looseness={looseness:.2f}] "
+            rf"node[{with_edge_label_style(node_opt)}] {{{label}}} ({t});"
+        )
 
     # 3) 交叉耦合
     if is_cross_coupling(s, t):
-        if node_group(s) == "n" and node_group(t) == "m":
-            # 上 -> 下
-            return rf"\draw ({s}) -- node[pos=0.40,right] {{{label}}} ({t});"
-        else:
-            # 下 -> 上
-            return rf"\draw ({s}) -- node[pos=0.60,left] {{{label}}} ({t});"
+        out_angle, in_angle, node_opt, looseness = cross_coupling_style(s, t, positions)
+        return (
+            rf"\draw ({s}) to[out={out_angle},in={in_angle},looseness={looseness:.2f}] "
+            rf"node[{with_edge_label_style(node_opt)}] {{{label}}} ({t});"
+        )
 
     # 4) 主通道
     if is_forward_edge(s, t):
-        return rf"\draw ({s}) -- node {{{label}}} ({t});"
+        return rf"\draw ({s}) -- node[{with_edge_label_style('midway,above')}] {{{label}}} ({t});"
 
     # 5) 其他默认
-    return rf"\draw ({s}) -- node {{{label}}} ({t});"
+    return rf"\draw ({s}) -- node[{with_edge_label_style(straight_label_opt(s, t, positions))}] {{{label}}} ({t});"
 
 
 def csv_to_tikz(csv_path: str) -> str:
@@ -290,12 +530,22 @@ def csv_to_tikz(csv_path: str) -> str:
             edges.append((s, t, g))
 
     positions = auto_positions(edges)
+    edge_pairs, _ = build_edge_sets(edges)
 
-    lines = [r"\begin{tikzpicture}[>=stealth,->,auto]"]
+    lines = [r"\begin{tikzpicture}["]
+    lines.append(r"  >=Latex,")
+    lines.append(r"  ->,")
+    lines.append(r"  semithick,")
+    lines.append(r"  every node/.style={font=\small},")
+    lines.append(r"  signal node/.style={circle,draw,minimum size=8mm,inner sep=1pt,fill=white},")
+    lines.append(r"  io node/.style={rectangle,rounded corners=2pt,draw,minimum width=8mm,minimum height=6mm,inner sep=2pt,fill=gray!8},")
+    lines.append(r"  every path/.style={draw=black!85},")
+    lines.append(r"  edge label/.style={fill=white,inner sep=1pt,text=black},")
+    lines.append(r"]")
     lines.extend(build_node_lines(positions))
 
     for s, t, g in edges:
-        lines.append(edge_to_tikz(s, t, g, positions))
+        lines.append(edge_to_tikz(s, t, g, positions, edge_pairs))
 
     lines.append(r"\end{tikzpicture}")
     return "\n".join(lines)

@@ -1,0 +1,12 @@
+start,end,gain
+R,A,G1
+A,B,G2
+B,C,G3
+C,D,G4
+D,Y,G5
+A,L1,H1
+L1,A,H_1b
+B,L2,H2
+L2,B,H_2b
+C,L3,H3
+L3,C,H_3

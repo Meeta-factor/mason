@@ -58,12 +58,11 @@ than computational optimality. Loop enumeration may become expensive
 for large graphs.
 
 """
-from .solver import SISOMasonSolver, MIMOMasonSolver
+from .solver import MasonSolver,MIMOSFGSolver,ShannonHappSolver
 from .visualize import  show_result, solve_and_show
 
 __all__ = [
-    "SISOMasonSolver",
-    "MIMOMasonSolver",
+    "MasonSolver",
     "show_result",
     "solve_and_show",
 ]
