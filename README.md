@@ -171,6 +171,7 @@ examples/
 ## 🧠 理论基础
 
 ### **Mason 增益公式**
+
 $$T = \frac{\sum_{k} P_{k} \Delta_{k}}{\Delta}$$
 其中：
 
