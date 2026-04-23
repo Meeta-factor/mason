@@ -278,6 +278,6 @@ def solve_and_show(solver: Any, expand_result: bool = False):
     """
     对已经 load_from_dict 的 solver 进行求解并显示结果。
     """
-    T, info = solver.solve(expand_result=expand_result)
+    T, info = solver.solve(expand_result=expand_result, return_info=True)
     show_result(info)
     return T, info

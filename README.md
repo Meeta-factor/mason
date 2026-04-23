@@ -28,15 +28,24 @@
 ---
 
 ## ⚙️ 安装方式
-推荐使用虚拟环境：
+
+### 克隆代码
 ```bash
 git clone https://github.com/Meeta-factor/mason.git
 cd mason
+```
+### 安装
+#### 虚拟环境安装
+```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
-python examples/siso_sfg.py
 ```
+#### 本地安装
+```bash
+pip install .
+```
+
 
 ---
 
@@ -45,7 +54,7 @@ python examples/siso_sfg.py
 ### 1️⃣ 构建系统
 
 ```python
-from mason.solver import MIMOMasonSolver
+from mason.solver import MasonSolver
 
 solver = MIMOMasonSolver()
 
@@ -123,10 +132,10 @@ show_result(info[0][0])  # 查看某个传函
 
 ## 🎉 Examples
 
-- `examples/siso_sfg.py` – basic usage
-- `examples/mimo_sfg.py` – multi-input multi-output system
-- `examples/feedback_system.py` – classic control example
-
+- `examples/solver.ipynb` – basic usage
+- `examples/control.ipynb` – control interface
+- `examples/load.ipynb` – classic control example
+- `examples/loop3.ipynb` – multi-loops example
 ---
 
 ## 📊 功能特性
@@ -136,61 +145,75 @@ show_result(info[0][0])  # 查看某个传函
 * ✅ 符号计算支持（SymPy）
 * ✅ 支持复杂反馈结构
 * ✅ MIMO 传递矩阵
-* ✅ 无路径自动填 0
-* ✅ pytest 自动验证
+
+
 
 ---
 
-## 🧪 测试
 
-运行测试：
-
-```bash
-pytest -v
-```
-
-当前测试覆盖：
-
-* 无环系统
-* 单反馈环
-* 多回路系统
-* MIMO 系统
-* 耦合与非耦合结构
-
----
 
 ## 📁 项目结构
 
 ```
 mason/
-├── solver.py        # 核心算法（Mason公式）
+├── solver.py        # 核心算法
 ├── visualize.py     # 可视化与结果展示
 ├── typing_defs.py   # 类型定义
-tests/
-├── test_siso.py
-├── test_mimo.py
 examples/
-├── siso_sfg.py
-├── mimo_sfg.py
-├── feedback_system.py
-├── from_csv.py
+├── control.ipynb
+├── load.ipynb
+├── shannon.ipynb
+├── solver.ipynb
 ```
 
 ---
 
 ## 🧠 理论基础
 
-Mason 增益公式：
-
+### **Mason 增益公式**
 $$
-T = \frac{\sum_k P_k \Delta_k}{\Delta}
+T = \frac{\sum_{k} P_{k} \Delta_{k}}{\Delta}
 $$
-
 其中：
 
 *  $P_k $：第 k 条前向路径
 *  $\Delta$：系统行列式
 *  $\Delta_k$ ：与路径不接触的回路组成的行列式
+### **Shannon happ公式**
+本项目除了支持经典的 Mason 增益公式外，也支持使用 **Shannon–Happ 公式** 计算信号流图的传递函数。
+Shannon–Happ 公式是求解信号流图传递函数的另一种经典方法。  
+它的基本思想是：在原始开环信号流图的基础上，从输出节点到输入节点人为添加一条增益为 $1/G$ 的支路，其中 $G$ 为待求传递函数。这样，原来的开环图就被转化为一个闭合图。
+在这个闭合图上，传递函数的求解可以转化为对系统中各类回路及其互不接触组合的分析，而不再需要像 Mason 公式那样显式列出前向通路及对应的余子式。
+
+其特征方程通常可以写成：
+
+$$
+f\!\left(\frac{1}{G}\right)
+=
+1-\sum L_i+\sum L_iL_j-\sum L_iL_jL_k+\cdots=0
+$$
+
+其中：
+
+- $L_i$ 表示单个回路的增益；
+- $L_iL_j$ 表示两个互不接触回路的增益乘积；
+- $L_iL_jL_k$ 表示三个两两互不接触回路的增益乘积；
+- 更高阶项以此类推。
+
+通过求解上述关于 $1/G$ 的方程，即可得到系统的传递函数 $G$。
+
+---
+
+## 🎉TIKZ实现初步的信号流图
+### 前提条件:texlive-extra安装
+### SISO系统
+![loop3](./mason/tikz/loop3.png)
+### MIMO+自耦+互耦
+![ex](./mason/tikz/ex.png)
+![data](./mason/tikz/data.png)
+
+
+
 
 ---
 
@@ -206,11 +229,10 @@ $$
 
 ## 🧩 未来计划
 
-* [ ] 状态空间转换
+* [x] 状态空间转换
+* [] 自动生成报告（LaTeX）
 * [ ] 控制系统解耦分析
 * [ ] LQR / 最优控制接口
-* [ ] GUI 或 Web 可视化
-* [ ] 自动生成报告（LaTeX）
 
 ---
 

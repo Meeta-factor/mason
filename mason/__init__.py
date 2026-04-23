@@ -39,7 +39,7 @@ Typical Usage
 -------------
     solver = SISOMasonSolver()
     solver.load_from_dict(data)
-    T, info = solver.solve()
+    T, info = solver.solve(return_info=True)
 
     solver.show_result(info)
 
