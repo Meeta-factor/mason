@@ -136,6 +136,7 @@ show_result(info[0][0])  # 查看某个传函
 - `examples/control.ipynb` – control interface
 - `examples/load.ipynb` – classic control example
 - `examples/loop3.ipynb` – multi-loops example
+- `examples/shannon.ipynb` – shannon example
 ---
 
 ## 📊 功能特性
