@@ -173,6 +173,8 @@ examples/
 ### **Mason 增益公式**
 
 $$T = \frac{\sum_{k} P_{k} \Delta_{k}}{\Delta}$$
+
+
 其中：
 
 *  $P_k $：第 k 条前向路径
