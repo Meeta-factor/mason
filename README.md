@@ -54,7 +54,7 @@ pip install .
 ### 1️⃣ 构建系统
 
 ```python
-from mason.solver import MasonSolver
+from mason.solver import MasonSolver,MIMOSFGSolver,ShannonHappSolver
 
 solver = MIMOMasonSolver()
 
@@ -77,12 +77,12 @@ solver.load_from_dict(data)
 ### 2️⃣ 计算传递矩阵
 
 ```python
-G = solver.transfer_matrix(
+G,info = solver.transfer_matrix(
     sources=data["sources"],
     sinks=data["sinks"]
 )
 
-print(G)
+display(G)
 ```
 
 输出：
@@ -115,10 +115,8 @@ $$
 ### 4️⃣ 查看详细推导过程
 
 ```python
-G, info = solver.transfer_matrix(..., return_info=True)
-
 from mason.visualize import show_result
-show_result(info[0][0])  # 查看某个传函
+show_result(info,entry=("C1","R2"))
 ```
 
 展示内容包括：
