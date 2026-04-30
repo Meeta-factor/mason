@@ -55,7 +55,7 @@ pip install .
 
 ```python
 from mason.solver import MasonSolver,MIMOSFGSolver,ShannonHappSolver
-solver = MIMOSFGSolver(=MasonSolver)
+solver = MIMOSFGSolver(MasonSolver)
 data = {
     "edges": [
         ("R1", "C1", "G11"),
